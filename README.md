@@ -112,6 +112,11 @@ python3 slides/build_deck.py
 - "外部资料"（官方 Q&A 之外的架构数字、生产参数）会在文中标注。
 - 未在本机运行：macOS 无 SM100，`deepinfer._C` 无法构建；所有结论来自静态分析 + 仓库自带图表。
 
+## 姊妹仓库
+
+- [`nano-vllm-study`](https://github.com/Akashaf-coder/nano-vllm-study)：`GeeeekExplorer/nano-vllm`（1,450 行的最小 vLLM 实现）的 16 节课精读 + 可跑实验。
+- 建议顺序：**先读 nano-vllm-study 建立骨架**（调度 / 分页 KV / 前缀缓存 / TP 的最小版本），再读本仓库看生产框架如何为单一模型做外科手术。对照表见 nano 仓库的 `docs/15-与DeepInfer对照.md`。
+
 ## 原始仓库
 
 ```bash
