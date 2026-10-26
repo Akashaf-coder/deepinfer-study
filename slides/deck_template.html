@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepInfer 深度解析</title>
+<style>
+:root{
+  --bg:#05070f; --panel:#0b1224; --panel2:#101a33;
+  --line:rgba(126,166,255,.16); --line2:rgba(126,166,255,.28);
+  --tx:#e9eefb; --mut:#8fa0c4; --dim:#5f7296;
+  --teal:#3ee0c5; --amber:#ffc06b; --violet:#a596ff; --red:#ff7a95;
+  --mono:"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"PingFang SC","Hiragino Sans GB","Source Han Sans SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:var(--sans);overflow:hidden}
+body{background:
+  radial-gradient(1100px 760px at 12% -8%, #14264f 0%, transparent 58%),
+  radial-gradient(900px 700px at 104% 112%, #221642 0%, transparent 55%),
+  var(--bg);}
+.deck{position:fixed;left:50%;top:50%;width:1280px;height:720px;transform-origin:center center}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;padding:54px 72px 62px;border-radius:22px;
+  background:linear-gradient(165deg, rgba(18,28,56,.92) 0%, rgba(8,13,27,.96) 60%, rgba(7,11,23,.98) 100%);
+  border:1px solid rgba(126,166,255,.10);overflow:hidden}
+.slide.active{display:flex}
+.slide::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:22px;
+  background-image:linear-gradient(rgba(160,190,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(160,190,255,.045) 1px,transparent 1px);
+  background-size:52px 52px;
+  -webkit-mask-image:radial-gradient(120% 90% at 30% 0%, #000 20%, transparent 78%);
+          mask-image:radial-gradient(120% 90% at 30% 0%, #000 20%, transparent 78%);}
+.slide::after{content:"";position:absolute;left:72px;top:0;width:132px;height:3px;background:linear-gradient(90deg,var(--teal),rgba(62,224,197,0))}
+.kicker{font-size:12px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;font-weight:600}
+h1{font-size:44px;line-height:1.14;margin:8px 0 6px;font-weight:750;letter-spacing:-.01em}
+h1 .thin{color:var(--mut);font-weight:400}
+h2{font-size:34px;line-height:1.2;margin:6px 0 4px;font-weight:700}
+h3{font-size:20px;margin:0 0 6px;font-weight:650;color:var(--tx)}
+.lead{font-size:20px;line-height:1.55;color:var(--mut);margin:4px 0 0;max-width:1040px}
+.body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;min-height:0;position:relative;z-index:1}
+.body.top{justify-content:flex-start}
+.mono{font-family:var(--mono)}
+.teal{color:var(--teal)} .amber{color:var(--amber)} .violet{color:var(--violet)} .red{color:var(--red)} .mut{color:var(--mut)}
+.small{font-size:15px;color:var(--dim)}
+.caption{font-size:14px;color:var(--dim);letter-spacing:.02em}
+.stats{display:flex;gap:18px}
+.stat{flex:1;padding:22px 24px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(160deg,rgba(255,255,255,.045),rgba(255,255,255,.012))}
+.stat b{display:block;font-size:52px;line-height:1;font-weight:760;letter-spacing:-.02em;
+  background:linear-gradient(120deg,#fff 10%,var(--teal) 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{display:block;margin-top:10px;font-size:15px;color:var(--mut);line-height:1.45}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,rgba(255,255,255,.04),rgba(255,255,255,.008))}
+.card.tight{padding:16px 18px}
+.card p{margin:6px 0 0;font-size:16px;line-height:1.55;color:var(--mut)}
+.card .num{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.1em}
+.card.hl{border-color:rgba(62,224,197,.35);box-shadow:0 0 0 1px rgba(62,224,197,.06) inset,0 10px 40px -24px rgba(62,224,197,.5)}
+.card.warn{border-color:rgba(255,192,107,.32)}
+.card.bad{border-color:rgba(255,122,149,.30)}
+.tag{display:inline-block;font-size:12px;letter-spacing:.08em;padding:3px 9px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);font-family:var(--mono)}
+.tag.t{color:var(--teal);border-color:rgba(62,224,197,.4)}
+.tag.a{color:var(--amber);border-color:rgba(255,192,107,.4)}
+.tag.v{color:var(--violet);border-color:rgba(165,150,255,.4)}
+.tag.r{color:var(--red);border-color:rgba(255,122,149,.4)}
+ul.bul{list-style:none;padding:0;margin:0}
+ul.bul li{position:relative;padding-left:26px;margin:9px 0;font-size:19px;line-height:1.5}
+ul.bul li::before{content:"▸";position:absolute;left:2px;top:0;color:var(--teal)}
+ul.bul.sm li{font-size:16px;margin:6px 0;line-height:1.5}
+ul.bul.x li::before{content:"✕";color:var(--red);font-size:15px;top:2px}
+ul.bul.q li::before{content:"?";color:var(--amber);font-weight:700}
+.tbl{width:100%;border-collapse:collapse;font-size:16px}
+.tbl th{text-align:left;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line2)}
+.tbl td{padding:9px 10px;border-bottom:1px solid rgba(126,166,255,.09);vertical-align:top;line-height:1.45}
+.tbl tr:last-child td{border-bottom:none}
+.tbl td.k{color:var(--mut);white-space:nowrap}
+.tbl .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.code{font-family:var(--mono);font-size:14.5px;line-height:1.62;background:rgba(2,6,16,.72);border:1px solid rgba(126,166,255,.12);
+  border-left:3px solid rgba(62,224,197,.65);border-radius:10px;padding:14px 16px;white-space:pre-wrap;color:#cfe0ff;overflow:hidden}
+.code .c{color:#6d82a8}
+.code .k{color:#ffc06b}
+.code .s{color:#8be9d3}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.node{padding:10px 14px;border:1px solid var(--line2);border-radius:10px;font-size:15px;background:rgba(255,255,255,.03);white-space:nowrap}
+.node.hl{border-color:rgba(62,224,197,.5);color:var(--teal)}
+.node.am{border-color:rgba(255,192,107,.5);color:var(--amber)}
+.arw{color:var(--dim);font-size:16px;padding:0 2px}
+.quote{font-size:30px;line-height:1.45;font-weight:650;letter-spacing:-.01em}
+.quote .hl{color:var(--teal)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.klist{display:flex;flex-direction:column;gap:8px}
+.krow{display:flex;align-items:baseline;gap:14px;padding:10px 0;border-bottom:1px solid rgba(126,166,255,.09)}
+.krow:last-child{border-bottom:none}
+.krow b{font-family:var(--mono);font-size:15px;color:var(--teal);min-width:64px}
+.krow span{font-size:16px;color:var(--mut);line-height:1.45}
+.shot{display:block;width:100%;max-height:455px;object-fit:contain;border-radius:12px;border:1px solid var(--line)}
+.shotwrap{display:flex;justify-content:center;align-items:center;flex:1;min-height:0}
+.callout{display:flex;gap:10px;align-items:flex-start;font-size:15.5px;color:var(--mut);line-height:1.5}
+.callout b{color:var(--tx);font-weight:650}
+.bar{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--teal),#6ba8ff)}
+.layerrow{display:grid;grid-template-columns:180px 1fr 70px;gap:14px;align-items:center;padding:7px 0}
+.layerrow .nm{font-family:var(--mono);font-size:14px;color:var(--mut)}
+.layerrow .nn{font-family:var(--mono);font-size:13px;color:var(--dim);text-align:right}
+.hud{position:absolute;left:72px;right:72px;bottom:22px;display:flex;justify-content:space-between;align-items:center;
+  font-size:11px;letter-spacing:.14em;color:#52648a;text-transform:uppercase;z-index:5}
+.hud .lbl{opacity:.9}
+.pbar{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.05);z-index:6}
+.pbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#7aa2ff);transition:width .25s ease}
+.hint{position:fixed;right:22px;top:16px;font-size:10.5px;color:#3f5074;letter-spacing:.12em;z-index:9;text-align:right}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  html,body{overflow:visible;background:#05070f}
+  .deck{position:static;transform:none!important;width:1280px;height:auto}
+  .slide{position:relative;display:flex!important;width:1280px;height:720px;border-radius:0;border:none;page-break-after:always;break-after:page}
+  .hud,.hint,.pbar{display:none}
+}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- 01 -->
+<section class="slide" data-label="封面">
+  <div class="kicker">DeepSeek · Inference System · 2026</div>
+  <div class="body">
+    <h1 style="font-size:74px;margin:0">DeepInfer<br><span class="thin" style="font-size:40px">深度解析：为一个模型，重写一套引擎</span></h1>
+    <p class="lead" style="font-size:21px;max-width:1020px">从 vLLM 的骨架出发，看 C++ 调度器、ZOS 流水线、<br>YoCo 截断与 DSpark 投机如何咬合。</p>
+    <div style="display:flex;gap:26px;margin-top:18px;font-family:var(--mono);font-size:13px;color:var(--dim)">
+      <span>repo&nbsp; deepseek-ai/DeepInfer</span><span>commit&nbsp; 9bd9cf2</span><span>license&nbsp; Apache-2.0</span><span>55k py · 5.9k cpp</span>
+    </div>
+  </div>
+</section>
+
+<!-- 02 -->
+<section class="slide" data-label="一句话">
+  <div class="kicker">Thesis</div>
+  <div class="body">
+    <div class="quote">它不是“又一个 vLLM”，<br>而是 <span class="hl">vLLM 被拆开、为一个模型重新焊死</span>的样子。</div>
+    <div class="stats" style="margin-top:6px">
+      <div class="stat"><b>55k</b><span>行 Python / 270 个文件</span></div>
+      <div class="stat"><b>5.9k</b><span>行 C++ / 33 个文件</span></div>
+      <div class="stat"><b>1</b><span>个模型：V4.1-Flash</span></div>
+    </div>
+    <p class="caption" style="margin-top:2px">代码量统计：<span class="mono">find . -name '*.py' -exec cat {} + | wc -l</span></p>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="slide" data-label="边界">
+  <div class="kicker">Boundaries</div>
+  <div class="body top">
+    <h2>先排除四个错误预期</h2>
+    <div class="grid2" style="margin-top:6px">
+      <div class="card bad"><h3><span class="red">✕</span> 通用框架</h3><p>只认 V4.1-Flash 的 HF checkpoint；换模型要改模型代码 + kernel，不是改配置。</p></div>
+      <div class="card bad"><h3><span class="red">✕</span> 多代硬件</h3><p>只支持 SM100 / Ascend 950。H100/A100 在 <span class="mono">get_bf16_tflops_limit()</span> 直接抛错。</p></div>
+      <div class="card bad"><h3><span class="red">✕</span> 在线服务</h3><p>没有 OpenAI server，没有 AsyncLLMEngine；<span class="mono">entrypoints/</span> 只有离线 <span class="mono">LLM</span>。</p></div>
+      <div class="card bad"><h3><span class="red">✕</span> 稳定 API</h3><p>v0.1.0、4 个 commit、154 个 PR；接口随时会变，学习请 pin commit。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="slide" data-label="三个数字">
+  <div class="kicker">Numbers</div>
+  <div class="body">
+    <h2>三个反直觉的数字</h2>
+    <div class="grid3">
+      <div class="card hl"><div class="num">01</div><h3 style="font-size:38px;margin:6px 0" class="teal">42%</h3><p>Python 代码里是 TileLang kernel（23,331 / 54,929 行）。真正的框架逻辑只有约 3 万行。</p></div>
+      <div class="card hl"><div class="num">02</div><h3 style="font-size:38px;margin:6px 0" class="amber">0</h3><p>全仓库 <span class="mono">tensor_parallel</span> / <span class="mono">tp_size</span> 出现次数。并行只有 EP / DP / CP。</p></div>
+      <div class="card hl"><div class="num">03</div><h3 style="font-size:38px;margin:6px 0" class="violet">64</h3><p>个 <span class="mono">DEEPINFER_*</span> 环境变量。调度、缓存、kernel、调试行为大量靠 env 切换。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="slide" data-label="血统">
+  <div class="kicker">Lineage</div>
+  <div class="body">
+    <h2>三种基因，一次重写</h2>
+    <div class="grid3">
+      <div class="card"><div class="tag">vLLM</div><h3 style="margin-top:10px">引擎骨架</h3><p>LLMEngine / Worker / ModelRunner / CacheEngine / Sequence 的分层与命名。</p><p class="mono small" style="margin-top:8px">文件头：Derived from vLLM</p></div>
+      <div class="card"><div class="tag a">SGLang</div><h3 style="margin-top:10px">异步调度</h3><p>ZOS 的四段流水线。Q&amp;A 原文：“Following SGLang, NanoFlow”。</p></div>
+      <div class="card"><div class="tag v">TensorRT-LLM</div><h3 style="margin-top:10px">图与融合</h3><p>CUDA Graph、kernel 融合、profile 驱动的调优思路。</p></div>
+    </div>
+    <div class="flow" style="margin-top:4px">
+      <span class="node">vLLM</span><span class="arw">──改造──▶</span><span class="node hl">DeepInfer</span><span class="arw">◀──借鉴──</span><span class="node">SGLang</span>
+    </div>
+    <p class="caption">最不像 vLLM 的地方：调度器从 Python 搬进了 C++（<span class="mono">csrc/engine/</span>）。</p>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="slide" data-label="系统全景">
+  <div class="kicker">System Overview</div>
+  <div class="body top" style="gap:10px">
+    <h2 style="font-size:28px">开源的是“引擎”，不是“系统”</h2>
+    <div class="shotwrap"><img class="shot" src="__IMG_ARCH__" alt="architecture"></div>
+    <p class="caption">Entrypoint ×3 · VE/Prefill/Decode LB · EPLB · 3FS KV Store：中间一圈在本仓库；外圈（KV 存储、负载均衡、扩缩容、Recipe）未开源。</p>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="slide" data-label="三种引擎">
+  <div class="kicker">Engine Types</div>
+  <div class="body">
+    <h2>一个类，三种形态</h2>
+    <div class="grid3">
+      <div class="card"><div class="tag t">NORMAL</div><h3 style="margin-top:10px">P + D 合一</h3><p>既做 prefill 又做 decode。开发调试、小规模部署。</p><p class="mono small">step 里投票决定这一步做哪种</p></div>
+      <div class="card"><div class="tag a">PROMPT</div><h3 style="margin-top:10px">只做 prefill</h3><p>算完把 prompt 发给 completion；不做 decode。</p><p class="mono small">assert prompt_run</p></div>
+      <div class="card"><div class="tag v">COMPLETION</div><h3 style="margin-top:10px">只做 decode</h3><p>EP64–128 的 decode 集群；不接收新 prompt。</p><p class="mono small">必须 stop_preempted_request=true</p></div>
+    </div>
+    <div class="code" style="margin-top:4px"><span class="c">// csrc/engine/scheduler.hpp — 三种形态共用一套调度代码，靠钩子分化</span>
+<span class="k">case</span> EngineType::PROMPT:     <span class="k">return</span> _schedule_prefill(acquire);
+<span class="k">case</span> EngineType::COMPLETION: <span class="k">return</span> _schedule_decode(acquire);</div>
+  </div>
+</section>
+
+<!-- 08 -->
+<section class="slide" data-label="代码地图">
+  <div class="kicker">Code Map</div>
+  <div class="body">
+    <h2>5.5 万行怎么分布</h2>
+    <div>
+      <div class="layerrow"><span class="nm">entrypoints</span><span class="bar"><i style="width:4%"></i></span><span class="nn">0.5k</span></div>
+      <div class="layerrow"><span class="nm">engine</span><span class="bar"><i style="width:8%"></i></span><span class="nn">2.0k</span></div>
+      <div class="layerrow"><span class="nm">worker</span><span class="bar"><i style="width:11%"></i></span><span class="nn">2.8k</span></div>
+      <div class="layerrow"><span class="nm">csrc/engine</span><span class="bar"><i style="width:22%"></i></span><span class="nn">5.9k</span></div>
+      <div class="layerrow"><span class="nm">models</span><span class="bar"><i style="width:28%"></i></span><span class="nn">7.1k</span></div>
+      <div class="layerrow"><span class="nm">layers（含 kernel）</span><span class="bar"><i style="width:100%"></i></span><span class="nn">25.0k</span></div>
+      <div class="layerrow"><span class="nm">eplb / so / ve</span><span class="bar"><i style="width:9%"></i></span><span class="nn">2.4k</span></div>
+    </div>
+    <p class="caption">读的顺序应该反过来：先 engine/worker 的 5k 行骨架，再按需下潜到 models 和 kernel。</p>
+  </div>
+</section>
+
+<!-- 09 -->
+<section class="slide" data-label="生命周期">
+  <div class="kicker">Request Lifecycle</div>
+  <div class="body">
+    <h2>一个请求的七个阶段</h2>
+    <div class="flow" style="font-size:14px">
+      <span class="node">tokenize</span><span class="arw">→</span>
+      <span class="node">add_request</span><span class="arw">→</span>
+      <span class="node hl">schedule()</span><span class="arw">→</span>
+      <span class="node">execute_model</span><span class="arw">→</span>
+      <span class="node">sample</span><span class="arw">→</span>
+      <span class="node">post_process</span><span class="arw">→</span>
+      <span class="node">RequestOutput</span>
+    </div>
+    <table class="tbl" style="margin-top:6px">
+      <thead><tr><th>阶段</th><th>输入</th><th>输出</th><th>关键点</th></tr></thead>
+      <tbody>
+        <tr><td class="k">tokenize</td><td>字符串</td><td class="mono">np.int32[]</td><td>引擎不收字符串；VL 会改写成 image token</td></tr>
+        <tr><td class="k">add_request</td><td>tokens + params</td><td class="mono">Sequence</td><td>SO 编译异步提交；非法 token 直接丢</td></tr>
+        <tr><td class="k">schedule</td><td>队列状态</td><td class="mono">SchedulerOutputs</td><td>C++；每步选 batch、切 chunk</td></tr>
+        <tr><td class="k">execute</td><td class="mono">SequenceMetadata</td><td>hidden / logits</td><td>只读快照，避免执行期被改</td></tr>
+        <tr><td class="k">sample</td><td>logits</td><td class="mono">SamplerOutput</td><td>fused kernel；含投机验证</td></tr>
+        <tr><td class="k">post</td><td>SamplerOutput</td><td>指针数组</td><td>对象池 + 延后释放</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-label="step 内部">
+  <div class="kicker">LLMEngine.step()</div>
+  <div class="body">
+    <h2>每步的四段流水线，以及谁在等谁</h2>
+    <div class="grid2">
+      <div class="card"><div class="tag">CPU</div><h3 style="margin-top:8px">schedule</h3><p>C++ 选 batch；克隆/清零 state；<span class="mono">post_schedule</span> 钩子。</p></div>
+      <div class="card"><div class="tag t">GPU</div><h3 style="margin-top:8px">forward</h3><p>主模型；decode 走 CUDA Graph；DFlash 走独立 graph。</p></div>
+      <div class="card"><div class="tag t">GPU</div><h3 style="margin-top:8px">sample</h3><p>fused_sample：温度、top-k/p、log-softmax、采样、SO mask。</p></div>
+      <div class="card"><div class="tag">CPU</div><h3 style="margin-top:8px">post-process</h3><p>推进序列状态、判断结束、构造输出、统计。</p></div>
+    </div>
+    <div class="code"><span class="c"># llm_engine.py:860 — 输出是指针数组，不是 Python 对象列表</span>
+request_outputs = self._execute_model_async_step(seq_metadata_list, scheduler_outputs)
+self.deferred_release.collect_request_outputs(request_outputs)  <span class="c"># 下一步才释放</span></div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide" data-label="为什么 C++">
+  <div class="kicker">Scheduler · Why C++</div>
+  <div class="body">
+    <h2>把调度器搬进 C++：一次明确的取舍</h2>
+    <div class="split">
+      <div class="card"><h3>Python 调度器的成本</h3><ul class="bul sm"><li>每个 seq 的字段访问都走对象协议</li><li>高频小对象触发 GC 抖动</li><li>decode 步只有几毫秒，CPU 占比被放大</li></ul></div>
+      <div class="card"><h3>C++ 调度器的代价</h3><ul class="bul sm"><li>调试跨语言，Python 断点看不到内部</li><li>改调度要重编译</li><li>pybind 接口手写，字段变更要同步 .pyi</li></ul></div>
+    </div>
+    <p class="lead">判断：只有“模型固定、流量巨大、值得为每微秒优化”的团队才该学这招。通用框架选 Python 是对的。</p>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="slide" data-label="三个队列">
+  <div class="kicker">Scheduler · State</div>
+  <div class="body">
+    <h2>三个队列，一条状态机</h2>
+    <div class="flow" style="justify-content:space-between">
+      <span class="node" style="min-width:230px">waiting<br><span class="small">新请求 / 被抢占重算</span></span>
+      <span class="arw">──prefill──▶</span>
+      <span class="node am" style="min-width:230px">prompted<br><span class="small">prefill 完成，待转入</span></span>
+      <span class="arw">──admit──▶</span>
+      <span class="node hl" style="min-width:230px">running<br><span class="small">decode 中</span></span>
+    </div>
+    <ul class="bul sm" style="margin-top:4px">
+      <li><b>decode 步必须清空 running</b>：每个 seq 要么被调度、要么被抢占，<span class="mono">TORCH_CHECK(l == r)</span>。</li>
+      <li><b>被抢占的请求</b>：<span class="mono">reset_for_recompute()</span> 后 <span class="mono">push_front(waiting)</span>，下一轮重新 prefill。</li>
+      <li><b>锁</b>：<span class="mono">BlockManagerMutexAcquire</span> 同时锁 block 和 state 两个管理器。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide" data-label="两轮投票">
+  <div class="kicker">Scheduler · Voting</div>
+  <div class="body">
+    <h2>NORMAL 引擎：两轮 allreduce 决定做不做 prefill</h2>
+    <div class="split">
+      <div class="card"><div class="tag a">ALL 点</div><h3 style="margin-top:8px">全员都想做才做</h3><p>每 <span class="mono">prefill_attempt_interval</span> 步。防“一个 rank 干活、其他 rank 陪跑空 prompt”。</p><p class="mono small">allreduce(want?1:0, MIN) == 1</p></div>
+      <div class="card"><div class="tag t">ANY 点</div><h3 style="margin-top:8px">任一 rank 想做就做</h3><p>每 <span class="mono">prefill_any_attempt_interval</span> 步。给孤立 rank 兜底，防饿死。</p><p class="mono small">allreduce(want?0:1, MIN) == 0</p></div>
+    </div>
+    <div class="code"><span class="c">// 第二轮：want 只看 waiting 非空，_schedule_prefill 仍可能空手</span>
+<span class="c">// 全组都空手必须转 decode，否则 decode_step 被清零 → 下一步再投票 → 死循环</span>
+<span class="k">bool</span> any_scheduled = (_dp_allreduce(outputs ? 0 : 1, MIN) == 0);
+<span class="k">if</span> (!any_scheduled) <span class="k">return</span> _schedule_decode(acquire);</div>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="slide" data-label="chunk 裁剪">
+  <div class="kicker">Scheduler · Prefill</div>
+  <div class="body">
+    <h2>chunked prefill 的五维裁剪</h2>
+    <table class="tbl">
+      <thead><tr><th>维度</th><th>变量</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td class="k">单条上限</td><td class="mono">prompt_limit</td><td>不开 chunked = min(max_model_len, max_num_batched_tokens)</td></tr>
+        <tr><td class="k">token 预算</td><td class="mono">max_num_batched_tokens</td><td>所有 seqlen_q 之和</td></tr>
+        <tr><td class="k">KV 总长</td><td class="mono">prefill_max_sum_seqlen_k</td><td>防长上下文把 attention 的 K 维和算爆</td></tr>
+        <tr><td class="k">并发数</td><td class="mono">max_num_seqs</td><td>—</td></tr>
+        <tr><td class="k">块/slot</td><td class="mono">_can_allocate_with_state</td><td>返回 LATER 就 break，等下一轮</td></tr>
+      </tbody>
+    </table>
+    <p class="lead" style="font-size:17px">切分还要对齐：CP 的 <span class="mono">cp_size*2</span>、不切进 image pad、支持 <span class="mono">chunk_checkpoints</span> 强制断点。</p>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="slide" data-label="decode 调度">
+  <div class="kicker">Scheduler · Decode</div>
+  <div class="body">
+    <h2>LCFS + 抢占：尾延迟优先</h2>
+    <div class="flow">
+      <span class="node">按 output_len 降序排</span><span class="arw">→</span>
+      <span class="node hl">从最短的开始调度</span><span class="arw">→</span>
+      <span class="node am">块不够？从最长的抢</span>
+    </div>
+    <div class="split" style="margin-top:4px">
+      <div class="card"><h3>抢占后：重算</h3><p><span class="mono">reset_for_recompute()</span>，回到 waiting 队头。适用于普通请求。</p></div>
+      <div class="card warn"><h3>抢占后：结束</h3><p><span class="mono">stop_preempted_request=true</span> 或请求带 SO 状态（自动机不能重算）。</p></div>
+    </div>
+    <p class="caption">为什么 LCFS：让短请求尽快完成，降低平均排队；长输出本来就要跑很久，抢它重算的边际成本更可控（推断）。</p>
+  </div>
+</section>
+
+<!-- 16 -->
+<section class="slide" data-label="不变量">
+  <div class="kicker">Scheduler · Invariants</div>
+  <div class="body">
+    <h2>调试先看这 6 条断言</h2>
+    <div class="code" style="font-size:15px">1. sum(seqlens_q) == num_batched_tokens &lt;= max_num_batched_tokens
+2. seqlen_q + cache.num_tokens &lt;= seq.get_len()
+3. position_end &lt;= runtime_max_model_len
+4. decode 步 running 必须清空（全部调度或抢占）
+5. COMPLETION 必须 stop_preempted_request=true
+6. nextn&gt;0 时，MTP info slot 使用数 == running 大小</div>
+    <p class="lead" style="font-size:17px">这些不是“注释里的建议”，是 <span class="mono">TORCH_CHECK</span>。线上撞到任何一条，先回看是哪一步的调度状态被破坏了。</p>
+  </div>
+</section>
+
+<!-- 17 -->
+<section class="slide" data-label="ZOS 问题">
+  <div class="kicker">ZOS · Problem</div>
+  <div class="body">
+    <h2>decode 一步里，GPU 有两段空转</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;font-family:var(--mono);font-size:13px">
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:70px;color:var(--dim)">GPU</span><span class="node" style="flex:2">forward(N)</span><span class="node am" style="flex:1">idle</span><span class="node" style="flex:1.6">sample(N)</span><span class="node am" style="flex:1">idle</span><span class="node" style="flex:2">forward(N+1)</span></div>
+      <div style="display:flex;align-items:center;gap:6px"><span style="width:70px;color:var(--dim)">CPU</span><span class="node" style="flex:2">schedule(N)</span><span class="node" style="flex:1.6">launch</span><span class="node" style="flex:1">wait</span><span class="node" style="flex:1">post(N)</span><span class="node" style="flex:1.4">schedule(N+1)</span></div>
+    </div>
+    <ul class="bul sm" style="margin-top:6px">
+      <li><span class="mono">post_process(N)</span> 必须先拿到 sample 的 GPU→CPU 同步结果。</li>
+      <li>decode 的 step 是毫秒级，CPU 这两段可能占 5%–20%；batch 越小占比越高。</li>
+      <li>ZOS 的目标不是“调度更快”，而是“调度时 GPU 不空转”。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 18 -->
+<section class="slide" data-label="ZOS 流水线">
+  <div class="kicker">ZOS · Pipeline</div>
+  <div class="body">
+    <h2>把 CPU 提前一步</h2>
+    <div class="code" style="font-size:14px">GPU:  forward(N) ─────────────► sample(N) ──────────► forward(N+1)
+CPU:  schedule(N+1) → launch_forward(N+1) → post_process(N-1) → launch_sample(N+1)</div>
+    <div class="grid4">
+      <div class="card tight"><div class="num">1</div><h3 style="margin-top:4px">forward(N)</h3><p>当前步主模型</p></div>
+      <div class="card tight"><div class="num">2</div><h3 style="margin-top:4px">post(N-1)</h3><p>补上一步的后处理</p></div>
+      <div class="card tight"><div class="num">3</div><h3 style="margin-top:4px">sample(N)</h3><p>当前步采样</p></div>
+      <div class="card tight hl"><div class="num">4</div><h3 style="margin-top:4px">延迟 post(N)</h3><p>留给下一步 forward 重叠</p></div>
+    </div>
+    <p class="caption">顺序不能换成 1→3→2：那样 post(N-1) 要等 sample 同步，白等。</p>
+  </div>
+</section>
+
+<!-- 19 -->
+<section class="slide" data-label="ZOS 代价">
+  <div class="kicker">ZOS · Costs</div>
+  <div class="body">
+    <h2>三个新问题，三套补丁</h2>
+    <div class="grid3">
+      <div class="card"><h3>资源晚释放</h3><p><span class="mono">DeferredRelease</span>：本步产出挂起，下一步 <span class="mono">pre_sampler_sync</span> 才释放。</p></div>
+      <div class="card"><h3>空 rank 也要动</h3><p><span class="mono">placeholder step</span>：跑一个假 forward，保持 DP 组步型一致、NCCL 不超时。</p></div>
+      <div class="card"><h3>长度未知</h3><p>CPU 乐观估计 <span class="mono">seqlens_q</span>；GPU 用 D2H 回来的真实值修正 metadata。</p></div>
+    </div>
+    <p class="lead" style="font-size:17px">代价：输出“晚一步”、调试难、资源生命周期变长；收益：稳态下 GPU 的 forward→sample→forward 没有 gap。</p>
+  </div>
+</section>
+
+<!-- 20 -->
+<section class="slide" data-label="两套缓存">
+  <div class="kicker">KV Cache</div>
+  <div class="body">
+    <h2>为什么是两套缓存</h2>
+    <table class="tbl">
+      <thead><tr><th>维度</th><th>Paged block KV</th><th>State slot</th></tr></thead>
+      <tbody>
+        <tr><td class="k">ID</td><td class="mono">block_id</td><td class="mono">state_id</td></tr>
+        <tr><td class="k">粒度</td><td>block_size token</td><td>每序列一个固定 slot</td></tr>
+        <tr><td class="k">存什么</td><td>主 KV + indexer KV</td><td>SWA KV + 压缩状态</td></tr>
+        <tr><td class="k">何时写</td><td>每步</td><td>只在 128 token 边界</td></tr>
+        <tr><td class="k">进前缀缓存</td><td>是（外部 KV store）</td><td>否（只在产生它的机器）</td></tr>
+        <tr><td class="k">容量</td><td class="mono">num_gpu_blocks</td><td class="mono">num_state_seqs</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">生命周期、访问模式、介质、命中策略都不同，硬塞进一个 pool 会把逻辑搅烂。</p>
+  </div>
+</section>
+
+<!-- 21 -->
+<section class="slide" data-label="前缀缓存">
+  <div class="kicker">KV Cache · Where</div>
+  <div class="body">
+    <h2>前缀缓存不在引擎里</h2>
+    <div class="flow" style="justify-content:space-between">
+      <span class="node" style="min-width:250px">Entrypoint<br><span class="small">哈希链前缀匹配（只查 metadata）</span></span>
+      <span class="arw">──hit_tokens──▶</span>
+      <span class="node" style="min-width:250px">3FS KV Store<br><span class="small">异步拉到 host → GDR swap-in</span></span>
+      <span class="arw">──▶</span>
+      <span class="node hl" style="min-width:250px">Scheduler<br><span class="small">只分配命中之后的 block</span></span>
+    </div>
+    <div class="split" style="margin-top:6px">
+      <div class="card"><h3>引擎内有什么</h3><ul class="bul sm"><li>极简 free list + refcount</li><li>fork 请求的 pin + COW</li><li>没有 hash / LRU / radix tree</li></ul></div>
+      <div class="card bad"><h3>因此不能假设</h3><ul class="bul x sm"><li>同前缀自动复用</li><li><span class="mono">hit_tokens &gt; 0</span> 就代表数据已加载</li><li>单机能复现生产命中率</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- 22 -->
+<section class="slide" data-label="FP4 精度">
+  <div class="kicker">KV Cache · Precision</div>
+  <div class="body">
+    <h2>一份权重，四种精度</h2>
+    <table class="tbl">
+      <thead><tr><th>内容</th><th>格式</th><th>scale 粒度</th><th>为什么</th></tr></thead>
+      <tbody>
+        <tr><td class="k">主 KV</td><td class="mono">FP4 e4m3</td><td>per-16</td><td>最敏感，要更细的 scale</td></tr>
+        <tr><td class="k">Indexer KV</td><td class="mono">MXFP4 ue8m0</td><td>per-32</td><td>只用于打分选块，粗一点没关系</td></tr>
+        <tr><td class="k">MoE 权重</td><td class="mono">MXFP4 ue8m0</td><td>per-32</td><td>专家多、访问稀疏</td></tr>
+        <tr><td class="k">SWA KV</td><td class="mono">MXFP8</td><td>per-32</td><td>只有 20 层、134 token，量小</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">代码：<span class="mono">derive_main_kv_cache_num_per_channels()</span>；SWA 单序列约 1.35 MiB（20×134×528 B）。</p>
+  </div>
+</section>
+
+<!-- 23 -->
+<section class="slide" data-label="YoCo 架构">
+  <div class="kicker">YoCo / CED</div>
+  <div class="body">
+    <h2>prefill 只跑前一半层</h2>
+    <div style="display:flex;height:74px;border-radius:12px;overflow:hidden;border:1px solid var(--line)">
+      <div style="flex:1;background:linear-gradient(135deg,rgba(62,224,197,.28),rgba(62,224,197,.10));display:flex;align-items:center;justify-content:center;font-size:15px">encoder · 20 层（prefill 全算）</div>
+      <div style="flex:1;background:linear-gradient(135deg,rgba(165,150,255,.24),rgba(165,150,255,.08));display:flex;align-items:center;justify-content:center;font-size:15px">decoder / consumer · 20 层（只算后缀）</div>
+    </div>
+    <ul class="bul sm">
+      <li><b>CED</b>：decoder 的 global KV 由 encoder 最后一层 hidden 投影而来，不逐层自算。</li>
+      <li><b>代码</b>：<span class="mono">cfg.n_prefill_layer</span> 之后是 consumer；forward 在边界层切 metadata 视图。</li>
+      <li><b>激活参数</b>：外部资料称 prefill 8B / decode 16B；代码只认配置，不写死。</li>
+    </ul>
+    <p class="caption">20/20 为外部资料，代码只认 <span class="mono">n_prefill_layer</span>。这是“模型结构直接长进推理引擎”的典型：省的不是调度，是整段计算。</p>
+  </div>
+</section>
+
+<!-- 24 -->
+<section class="slide" data-label="mask vs compact">
+  <div class="kicker">YoCo · Two Modes</div>
+  <div class="body">
+    <h2>mask 与 compact：一个改可见域，一个真删行</h2>
+    <div class="split">
+      <div class="card"><div class="tag a">MASK</div><h3 style="margin-top:8px">不真截断</h3><ul class="bul sm"><li>仍算完整 token 行</li><li>把矩形外的 SWA 可见域置空（整行 -1）</li><li>实现简单，几乎不省算力</li></ul></div>
+      <div class="card hl"><div class="tag t">COMPACT</div><h3 style="margin-top:8px">真的只留后缀</h3><ul class="bul sm"><li>gather 出保留行，组成更短 varlen</li><li>hidden / residual / topk / candidates 一起搬</li><li>约省一半 prefill 计算</li></ul></div>
+    </div>
+    <p class="lead" style="font-size:17px">两者共用同一个 SWA 可见域公式，所以在保留区间内数值一致 —— 这是 <span class="mono">examples/yoco/</span> 要验证的。</p>
+  </div>
+</section>
+
+<!-- 25 -->
+<section class="slide" data-label="bounded replay">
+  <div class="kicker">YoCo · Bounded Replay</div>
+  <div class="body">
+    <h2>重算 128 个 token，而不是 2,560 个</h2>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;height:52px;border:1px dashed rgba(255,255,255,.15);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:14px">prefix cache 命中</div>
+      <div style="width:150px;height:52px;border-radius:8px;background:rgba(62,224,197,.18);border:1px solid rgba(62,224,197,.5);display:flex;align-items:center;justify-content:center;font-size:13px" class="teal">replay 128</div>
+      <div style="width:70px;height:52px;border-radius:8px;background:rgba(255,192,107,.15);border:1px solid rgba(255,192,107,.45);display:flex;align-items:center;justify-content:center;font-size:13px" class="amber">+6</div>
+    </div>
+    <div class="klist" style="margin-top:2px">
+      <div class="krow"><b>1</b><span>命中上限 = L − 134（128 窗口 + 6 回溯）</span></div>
+      <div class="krow"><b>2</b><span>先查 block KV → L1（128 的倍数）</span></div>
+      <div class="krow"><b>3</b><span>再查 [L1−128, L1] 的 SWA：有则命中 L1</span></div>
+      <div class="krow"><b>4</b><span>没有则退一个 block 到 L1−128，重放补齐</span></div>
+    </div>
+    <p class="caption">近似结果只用于 decode，不进入 prefix cache，避免误差累积。</p>
+  </div>
+</section>
+
+<!-- 26 -->
+<section class="slide" data-label="CSA2">
+  <div class="kicker">Attention · CSA2</div>
+  <div class="body">
+    <h2>一个 attention 类，四种机制</h2>
+    <div class="grid2">
+      <div class="card"><h3>压缩 KV（C1/C2）</h3><p>gated low-rank 压缩；只允许 ratio ∈ {0,1,2}，C4/C128 已删除。</p></div>
+      <div class="card"><h3>稀疏索引（MQA）</h3><p><span class="mono">relu(q@k)·w</span> 打分 → top-k 选块；单头，不用 softmax。</p></div>
+      <div class="card"><h3>SWA</h3><p>局部窗口兜底；与稀疏选中的全局块拼接。</p></div>
+      <div class="card"><h3>跨层共享</h3><p>Full / Reindex / Reuse：共享 main KV、indexer K 或 top-k 索引。</p></div>
+    </div>
+    <p class="caption">约束：稀疏必须配 SWA；不开 SWA 必须有 packed KV；indexer 头数必须全局唯一。</p>
+  </div>
+</section>
+
+<!-- 27 -->
+<section class="slide" data-label="三种层模式">
+  <div class="kicker">Attention · Layer Modes</div>
+  <div class="body">
+    <h2>Full / Reindex / Reuse：谁算 KV，谁算索引</h2>
+    <table class="tbl">
+      <thead><tr><th>模式</th><th>main KV</th><th>indexer K</th><th>top-k 索引</th><th>代码线索</th></tr></thead>
+      <tbody>
+        <tr><td class="k teal">Full</td><td>自己算</td><td>自己算</td><td>自己选</td><td class="mono">is_kv_source</td></tr>
+        <tr><td class="k amber">Reindex</td><td>复用</td><td>自己算</td><td>自己选</td><td class="mono">is_index_source</td></tr>
+        <tr><td class="k violet">Reuse</td><td>复用</td><td>复用</td><td>复用</td><td class="mono">shared_topology</td></tr>
+      </tbody>
+    </table>
+    <ul class="bul sm" style="margin-top:4px">
+      <li>共享后，后面几十层只读同一份 main KV，只维护很小的 indexer K。</li>
+      <li>分层索引器让后段只在“第一个 Full 层给出的候选池”里选，成本与上下文长度解耦。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 28 -->
+<section class="slide" data-label="EPLB">
+  <div class="kicker">EPLB · Concepts</div>
+  <div class="body">
+    <h2>逻辑专家 → 物理副本 → 卡</h2>
+    <div class="flow" style="justify-content:space-between">
+      <span class="node" style="min-width:230px">logical · 384<br><span class="small">模型定义的专家</span></span>
+      <span class="arw">──复制──▶</span>
+      <span class="node am" style="min-width:230px">physical · 448<br><span class="small">多放 64 个热门副本</span></span>
+      <span class="arw">──布局──▶</span>
+      <span class="node hl" style="min-width:230px">rank × 7 槽<br><span class="small">EP64，每卡 7 个</span></span>
+    </div>
+    <div class="split" style="margin-top:4px">
+      <div class="card"><h3>映射表</h3><p><span class="mono">physical_to_logical</span> · <span class="mono">logical_to_physical</span>，每层一份。dispatch / 路由 / sampler 直接读。</p></div>
+      <div class="card"><h3>指标</h3><p><span class="mono">moe_lb</span> = 最慢 rank / 平均。1.09 = 最慢比平均多 9% 的活。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 29 -->
+<section class="slide" data-label="EPLB 算法">
+  <div class="kicker">EPLB · Algorithm</div>
+  <div class="body">
+    <h2>两步：先决定复制谁，再决定放哪张卡</h2>
+    <div class="split">
+      <div class="card"><div class="tag a">STEP 1</div><h3 style="margin-top:8px">冗余给谁</h3><p>每轮给一个专家加副本，选“加完后最大每副本负载最低”的那个。</p><div class="code" style="font-size:13px;margin-top:8px">score = tokens / logical_count
+score_added = tokens / (count+1)
+argmin( max(score with one replaced) )</div></div>
+      <div class="card"><div class="tag t">STEP 2</div><h3 style="margin-top:8px">放哪张卡</h3><p>逐层贪心：最小化各 step 的 rank 峰值之和。</p><div class="code" style="font-size:13px;margin-top:8px">minimize  Σ_step  max_rank(load)</div></div>
+    </div>
+    <p class="caption">搬权重走 NVLink <span class="mono">symm_mem</span> 原地交换；decode 1 万步重排一次，prefill 1000 步。</p>
+  </div>
+</section>
+
+<!-- 30 -->
+<section class="slide" data-label="DSpark">
+  <div class="kicker">DSpark · Idea</div>
+  <div class="body">
+    <h2>固定验证 5 个，是浪费还是保险？</h2>
+    <div class="split">
+      <div class="card"><h3>固定长度</h3><p>每条请求都验证 5 个 draft。实现简单、可预测；但低概率 token 也在花验证算力。</p><div class="bar" style="margin-top:10px"><i style="width:100%"></i></div><p class="small mono" style="margin-top:6px">verify = 5.0</p></div>
+      <div class="card hl"><h3>DSpark 变长</h3><p>confidence head 预测每个 draft 的接受率，按期望收益排序，选前缀子集。</p><div class="bar" style="margin-top:10px"><i style="width:70%"></i></div><p class="small mono" style="margin-top:6px">verify = 3.2 – 4.4</p></div>
+    </div>
+    <p class="lead" style="font-size:17px">平均接受长度几乎不变（3.29 → 3.20），验证算力少 ~30%。</p>
+  </div>
+</section>
+
+<!-- 31 -->
+<section class="slide" data-label="DSpark 调度">
+  <div class="kicker">DSpark · Scheduling</div>
+  <div class="body">
+    <h2>两个队列，两个时间尺度</h2>
+    <div class="grid2">
+      <div class="card"><div class="tag a">N-2 轮</div><h3 style="margin-top:8px">决定总预算 best_bsz</h3><p>总量错误代价大，用更旧、更稳的接受率。</p></div>
+      <div class="card"><div class="tag t">N-1 轮</div><h3 style="margin-top:8px">分配每请求长度</h3><p>相对新，用于给高接受率的 draft 加格子。</p></div>
+    </div>
+    <div class="code" style="font-size:14px">throughput(bsz) = expected_tokens / (baseline_ms + slope_ms × graph_size + sampler_ms)
+expected_tokens = num_seqs + Σ accept_rate(draft)</div>
+    <p class="caption">按“单个 draft token”分配，不是按请求；一个请求可能拿到 0–5 个。ZOS 下这一步搬到 GPU（cumprod + global rank + remap）。</p>
+  </div>
+</section>
+
+<!-- 32 -->
+<section class="slide" data-label="DSpark 收益">
+  <div class="kicker">DSpark · Numbers</div>
+  <div class="body">
+    <h2>收益随并发递增，低并发会亏</h2>
+    <table class="tbl">
+      <thead><tr><th>并发 (seq/rank)</th><th>fixed-5 验证长度</th><th>dynamic 验证长度</th><th>接受长度</th><th>吞吐增益</th></tr></thead>
+      <tbody>
+        <tr><td class="num">16</td><td class="num">5</td><td class="num">4.44</td><td class="num">3.24</td><td class="num red">−1.5%</td></tr>
+        <tr><td class="num">32</td><td class="num">5</td><td class="num">3.65</td><td class="num">3.17</td><td class="num">+1.6%</td></tr>
+        <tr><td class="num">48</td><td class="num">5</td><td class="num">3.94</td><td class="num">3.26</td><td class="num">+3.6%</td></tr>
+        <tr><td class="num">60</td><td class="num">5</td><td class="num">3.58</td><td class="num">3.21</td><td class="num teal">+5.4%</td></tr>
+        <tr><td class="num">72</td><td class="num">5</td><td class="num">3.24</td><td class="num">3.12</td><td class="num teal">+6.7%</td></tr>
+        <tr><td class="num">96</td><td class="num">5</td><td class="num">3.24</td><td class="num">3.15</td><td class="num teal">+11.0%</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">数据来源：仓库 Q&A，EP64/DP64，nextn=5。低并发固定开销占比高，少验证省不了多少。</p>
+  </div>
+</section>
+
+<!-- 33 -->
+<section class="slide" data-label="Sampler">
+  <div class="kicker">Sampler</div>
+  <div class="body">
+    <h2>三件事：融合、可复现、可约束</h2>
+    <div class="grid3">
+      <div class="card"><h3>Fused</h3><p>温度、top-k/p、log-softmax、采样、SO mask 一个 kernel 完成，避免 logits 反复读写。</p></div>
+      <div class="card"><h3>Batch-invariant</h3><p>固定 reduction 顺序；不同 batch 组成下 bit 级一致（NVIDIA）。</p></div>
+      <div class="card"><h3>Deterministic</h3><p>hash 随机数 + 固定 <span class="mono">seq_seed</span> + 关 MTP varlen；相同输入相同输出。</p></div>
+    </div>
+    <div class="code" style="font-size:13.5px"><span class="c"># fused_sample.py — 一个 kernel 里做完五步</span>
+temperature → top-k/top-p → log-softmax → sample → (optional) logprobs / SO mask</div>
+    <p class="caption">没有确定性，<span class="mono">tests/models/offline_decode_ppl.json</span> 的逐样本 PPL 金标准就无法比对。</p>
+  </div>
+</section>
+
+<!-- 34 -->
+<section class="slide" data-label="结构化输出">
+  <div class="kicker">Structured Output</div>
+  <div class="body">
+    <h2>编译、匹配、掩码：三段解耦</h2>
+    <div class="flow">
+      <span class="node">schema / regex / EBNF</span><span class="arw">→</span>
+      <span class="node am">XGrammarCompiler<br><span class="small">独立线程池，异步</span></span><span class="arw">→</span>
+      <span class="node">XGrammarMatcher<br><span class="small">每请求一个</span></span><span class="arw">→</span>
+      <span class="node hl">fused sampler<br><span class="small">mask 直接作用 logits</span></span>
+    </div>
+    <ul class="bul sm" style="margin-top:4px">
+      <li><b>异步编译</b>：请求先提交，编译完由 <span class="mono">pump()</span> 收割并入调度；编不完不阻塞引擎。</li>
+      <li><b>失败隔离</b>：编译失败/超时只杀该请求（<span class="mono">FINISHED_SO_FAILED</span>）。</li>
+      <li><b>投机回滚</b>：draft 被拒时 <span class="mono">rollback(steps)</span>，否则自动机状态错位。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 35 -->
+<section class="slide" data-label="双硬件">
+  <div class="kicker">Dual Hardware</div>
+  <div class="body">
+    <h2>一套 Python，两套 kernel</h2>
+    <div class="split">
+      <div class="card"><h3>Platform 抽象</h3><ul class="bul sm"><li><span class="mono">tilelang_ops_backend</span>：cuda / asc</li><li><span class="mono">distributed_backend</span>：nccl / hccl</li><li><span class="mono">fp8_sf_type</span>：scale 类型</li><li><span class="mono">pin_host_memory</span>：异步 H2D</li></ul></div>
+      <div class="card"><h3>双份算子</h3><p><span class="mono">tilelang_ops/cuda/</span> 30 个文件<br><span class="mono">tilelang_ops/asc/</span> 30 个同名文件</p><p>约 1.1 万行重复实现，换每平台的极致性能。</p></div>
+    </div>
+    <p class="caption">构建：Python 依赖 → vendor wheel（DeepGEMM/FlashMLA/DeepEP/DeepSelect）→ <span class="mono">_C</span> 扩展 → 运行时 TileLang JIT。</p>
+  </div>
+</section>
+
+<!-- 36 -->
+<section class="slide" data-label="prefill 性能">
+  <div class="kicker">Performance · Prefill</div>
+  <div class="body top" style="gap:8px">
+    <h2 style="font-size:26px">Prefill：2 万 token 后曲线饱和</h2>
+    <div class="shotwrap"><img class="shot" src="__IMG_PREFILL__" alt="prefill pareto" style="max-height:420px"></div>
+    <div style="display:flex;gap:14px">
+      <div class="callout"><b>4k → 60k</b> tok/s/GPU，约 70 ms</div>
+      <div class="callout"><b>32k → 86k</b> tok/s/GPU，约 370 ms</div>
+      <div class="callout"><b>65k → 88k</b>：收益主要来自 YoCo，不是堆 batch</div>
+    </div>
+    <p class="caption">EP4DP4 · 131k ctx · bounded replay 140 · 384+32 experts</p>
+  </div>
+</section>
+
+<!-- 37 -->
+<section class="slide" data-label="decode 性能">
+  <div class="kicker">Performance · Decode</div>
+  <div class="body top" style="gap:8px">
+    <h2 style="font-size:26px">Decode：吞吐与交互性的硬 trade-off</h2>
+    <div class="shotwrap"><img class="shot" src="__IMG_DECODE__" alt="decode pareto" style="max-height:420px"></div>
+    <div style="display:flex;gap:14px">
+      <div class="callout"><b>64 并发</b>：15.5k tok/s/GPU，249 tok/s/user</div>
+      <div class="callout"><b>256 并发</b>：26k tok/s/GPU，但只剩 104 tok/s/user</div>
+      <div class="callout"><b>生产点</b>按 SLA 选，不是无脑堆并发</div>
+    </div>
+    <p class="caption">EP64DP64 · 131k ctx · nextn=3 · 75% 接受 · 384+64 experts</p>
+  </div>
+</section>
+
+<!-- 38 -->
+<section class="slide" data-label="Wide-EP">
+  <div class="kicker">Performance · Wide-EP</div>
+  <div class="body top" style="gap:8px">
+    <h2 style="font-size:26px">为什么 decode 要 EP64 而不是 EP8</h2>
+    <div class="shotwrap"><img class="shot" src="__IMG_WIDE__" alt="wide ep" style="max-height:400px"></div>
+    <div style="display:flex;gap:22px">
+      <div class="callout"><b>175 tok/s/user</b>：EP8 约 15k → EP64 约 22.5k（1.5×）</div>
+      <div class="callout"><b>250 tok/s/user</b>：EP8 约 8k → EP64 约 16k（2.0×）</div>
+    </div>
+    <p class="caption">EP 越大，单步 MoE 每卡访存量越小；配合 EPLB，把最慢 rank 压到平均的 1.09 倍。</p>
+  </div>
+</section>
+
+<!-- 39 -->
+<section class="slide" data-label="对比">
+  <div class="kicker">Comparison</div>
+  <div class="body">
+    <h2>和主流框架的结构性差异</h2>
+    <table class="tbl" style="font-size:14.5px">
+      <thead><tr><th>维度</th><th>DeepInfer</th><th>vLLM V1</th><th>SGLang</th><th>TensorRT-LLM</th></tr></thead>
+      <tbody>
+        <tr><td class="k">模型</td><td>仅 V4.1-Flash</td><td>极广</td><td>很广</td><td>广（需编译）</td></tr>
+        <tr><td class="k">硬件</td><td>SM100 / Ascend 950</td><td>NVIDIA/AMD/TPU/CPU</td><td>NVIDIA/AMD</td><td>NVIDIA</td></tr>
+        <tr><td class="k">并行</td><td>EP+DP+CP，无 TP</td><td>TP/PP/DP/EP</td><td>TP/DP/EP/PP</td><td>TP/PP/EP</td></tr>
+        <tr><td class="k">调度器</td><td>C++</td><td>Python</td><td>Python + overlap</td><td>C++ runtime</td></tr>
+        <tr><td class="k">前缀缓存</td><td>引擎外（3FS）</td><td>自动 block hash</td><td>RadixAttention</td><td>需配置</td></tr>
+        <tr><td class="k">投机</td><td>DSpark 变长</td><td>固定为主</td><td>EAGLE/draft</td><td>Medusa/EAGLE</td></tr>
+        <tr><td class="k">在线服务</td><td>无</td><td>OpenAI server</td><td>OpenAI/gRPC</td><td>Triton/server</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">竞品为 2026 年公开资料的共性描述；DeepInfer 为代码实证。</p>
+  </div>
+</section>
+
+<!-- 40 -->
+<section class="slide" data-label="五个差异">
+  <div class="kicker">Comparison · Five Shifts</div>
+  <div class="body">
+    <h2>五个“选择”，不是五个“优化”</h2>
+    <div class="klist">
+      <div class="krow"><b>C++</b><span>调度器换语言：用可维护性换 decode 小 step 的确定性开销。</span></div>
+      <div class="krow"><b>3FS</b><span>前缀缓存外移：用系统复杂度换任意前缀命中与存储/计算解耦。</span></div>
+      <div class="krow"><b>EP</b><span>放弃 TP：MoE 只传 token 不传权重，配合 EPLB 摊薄每卡访存。</span></div>
+      <div class="krow"><b>DSpark</b><span>投机从固定长度变成按边际收益分配验证算力。</span></div>
+      <div class="krow"><b>单模型</b><span>一个模型榨干两代硬件，而不是一个引擎适配 N 个模型。</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 41 -->
+<section class="slide" data-label="选型">
+  <div class="kicker">Selection</div>
+  <div class="body">
+    <h2>什么时候选谁</h2>
+    <div class="grid2">
+      <div class="card hl"><h3>DeepInfer</h3><p>部署 V4.1-Flash，手里有 SM100 / Ascend 950；要吃到 YoCo + CSA2 + FP4 KV 的全部收益。</p></div>
+      <div class="card"><h3>vLLM / SGLang</h3><p>部署任意 HF 模型，要 OpenAI API、LoRA、多租户、广泛硬件。</p></div>
+      <div class="card"><h3>TensorRT-LLM</h3><p>NVIDIA 上极致低延迟，能接受模型编译与较重的工程约束。</p></div>
+      <div class="card"><h3>LMDeploy</h3><p>快速起一个中文社区友好的 serving，工具链完整。</p></div>
+    </div>
+    <p class="lead" style="font-size:17px">读 DeepInfer 是为了学设计；选型时不要因为它“新”而忽略它的边界。</p>
+  </div>
+</section>
+
+<!-- 42 -->
+<section class="slide" data-label="学习路线">
+  <div class="kicker">Learning Path</div>
+  <div class="body">
+    <h2>四周：从骨架到能改</h2>
+    <div class="grid4">
+      <div class="card"><div class="num">WEEK 1</div><h3 style="margin-top:6px">骨架</h3><ul class="bul sm"><li>01 全景</li><li>02 生命周期</li><li>03 调度器</li><li>产出：时序图</li></ul></div>
+      <div class="card"><div class="num">WEEK 2</div><h3 style="margin-top:6px">调度与缓存</h3><ul class="bul sm"><li>04 ZOS</li><li>05 两套缓存</li><li>08 EPLB</li><li>产出：不变量清单</li></ul></div>
+      <div class="card"><div class="num">WEEK 3</div><h3 style="margin-top:6px">模型与 kernel</h3><ul class="bul sm"><li>06 YoCo</li><li>07 CSA2</li><li>09 DSpark</li><li>产出：分支树</li></ul></div>
+      <div class="card hl"><div class="num">WEEK 4</div><h3 style="margin-top:6px">输出</h3><ul class="bul sm"><li>13 实验</li><li>14 对比</li><li>专题笔记</li><li>产出：10 页 slides</li></ul></div>
+    </div>
+    <p class="caption">有 GPU 走“实验派”路线（先 13 再 04/06/09）；没有 GPU 走“源码读者”路线。</p>
+  </div>
+</section>
+
+<!-- 43 -->
+<section class="slide" data-label="五道狠题">
+  <div class="kicker">Self-test</div>
+  <div class="body">
+    <h2>能答上这 5 题，就算读懂了</h2>
+    <div class="klist">
+      <div class="krow"><b>Q1</b><span>为什么 NORMAL 引擎需要<b>两轮</b> allreduce？第二轮防的是什么死循环？</span></div>
+      <div class="krow"><b>Q2</b><span>ZOS 下为什么 <span class="mono">post_process(N-1)</span> 必须放在 forward(N) 之后、sample(N) 之前？</span></div>
+      <div class="krow"><b>Q3</b><span>YoCo 命中策略里，134 从哪来？为什么重放结果不能进 prefix cache？</span></div>
+      <div class="krow"><b>Q4</b><span>EPLB 为什么按“多 step 峰值之和”排布，而不是平均负载？</span></div>
+      <div class="krow"><b>Q5</b><span>DSpark 为什么用 N-2 轮接受率选总预算、N-1 轮分配每请求长度？</span></div>
+    </div>
+    <p class="caption">答案分别在 docs/03、04、06、08、09。</p>
+  </div>
+</section>
+
+<!-- 44 -->
+<section class="slide" data-label="坑">
+  <div class="kicker">Pitfalls</div>
+  <div class="body">
+    <h2>八个最容易踩的坑</h2>
+    <div class="grid2">
+      <div class="card tight"><p><b class="red">1.</b> vendor/ 是 submodule，普通 clone 是空目录。</p></div>
+      <div class="card tight"><p><b class="red">2.</b> H100/A100 跑不了：只认 SM10。</p></div>
+      <div class="card tight"><p><b class="red">3.</b> 没有在线 server，<span class="mono">LLM</span> 只是离线批量。</p></div>
+      <div class="card tight"><p><b class="red">4.</b> <span class="mono">hit_tokens</span> ≠ 数据已加载。</p></div>
+      <div class="card tight"><p><b class="red">5.</b> 自己写循环忘了 <span class="mono">pump()</span>，SO 请求永远不入调度。</p></div>
+      <div class="card tight"><p><b class="red">6.</b> ZOS 下加 <span class="mono">.item()</span> 会触发同步守卫。</p></div>
+      <div class="card tight"><p><b class="red">7.</b> 改 <span class="mono">block_size</span> 不只是改配置，kernel/CP/128 边界都耦合。</p></div>
+      <div class="card tight"><p><b class="red">8.</b> 低并发开 MTP varlen 可能负收益。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 45 -->
+<section class="slide" data-label="一页纸">
+  <div class="kicker">One Page</div>
+  <div class="body">
+    <h2>一页纸总结</h2>
+    <div class="klist" style="font-size:17px">
+      <div class="krow"><b>定位</b><span>DeepSeek 生产框架的开源子集：离线、单模型、两代硬件。</span></div>
+      <div class="krow"><b>结构</b><span>C++ 调度器 + Python 编排 + TileLang kernel + EP/DP，无 TP。</span></div>
+      <div class="krow"><b>三招牌</b><span>ZOS 流水线、YoCo bounded replay、DSpark 变长验证。</span></div>
+      <div class="krow"><b>最大差异</b><span>前缀缓存在引擎外（3FS），引擎内只有 fork/COW。</span></div>
+      <div class="krow"><b>性能</b><span>prefill 60–88k；decode 2.5–26k tok/s/GPU（交互性 325–104）。</span></div>
+      <div class="krow"><b>学习价值</b><span>看“通用框架如何为单一模型做外科手术”。</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 46 -->
+<section class="slide" data-label="结束">
+  <div class="kicker">Fin</div>
+  <div class="body">
+    <h1 style="font-size:56px;margin:0">读它，不是为了用它。<br><span class="thin" style="font-size:34px">是为了知道“快”可以被拆成多少个小决定。</span></h1>
+    <div style="margin-top:18px;font-family:var(--mono);font-size:13px;color:var(--dim);line-height:2">
+      repo&nbsp;&nbsp;&nbsp;&nbsp;~/DeepInfer<br>
+      docs&nbsp;&nbsp;&nbsp;&nbsp;~/deepinfer-study/docs/<br>
+      slides&nbsp;&nbsp;~/deepinfer-study/slides/DeepInfer-深度解析.html
+    </div>
+    <p class="lead" style="font-size:18px">下一步：挑一个专题（ZOS / YoCo / DSpark），读到能改，再设计一个验证实验。</p>
+  </div>
+</section>
+
+</div>
+<div class="pbar"><i id="pbar"></i></div>
+<div class="hint">← → 翻页 · F 全屏 · P 打印 / 导出 PDF</div>
+<script>
+(function(){
+  const deck=document.getElementById('deck');
+  const slides=[...deck.querySelectorAll('.slide')];
+  const pbar=document.getElementById('pbar');
+  let cur=0;
+  const hud=document.createElement('div');
+  hud.className='hud';
+  hud.innerHTML='<span class="lbl"></span><span class="num"></span>';
+  slides.forEach(s=>s.appendChild(hud.cloneNode(true)));
+  function fit(){
+    const s=Math.min(innerWidth/1280, innerHeight/720);
+    deck.style.transform='translate(-50%,-50%) scale('+s+')';
+  }
+  function show(n,push){
+    n=Math.max(0,Math.min(slides.length-1,n));
+    slides[cur].classList.remove('active');
+    cur=n;
+    slides[cur].classList.add('active');
+    const h=slides[cur].querySelector('.hud');
+    if(h){h.querySelector('.lbl').textContent=slides[cur].dataset.label||'';h.querySelector('.num').textContent=String(cur+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');}
+    pbar.style.width=((cur+1)/slides.length*100)+'%';
+    if(push!==false){location.hash='#/'+(cur+1);}
+    requestAnimationFrame(fit);
+  }
+  function next(){show(cur+1)} function prev(){show(cur-1)}
+  addEventListener('keydown',e=>{
+    if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();next();}
+    else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();prev();}
+    else if(e.key==='Home'){e.preventDefault();show(0);}
+    else if(e.key==='End'){e.preventDefault();show(slides.length-1);}
+    else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+    else if(e.key==='p'||e.key==='P'){window.print();}
+  });
+  addEventListener('click',e=>{
+    if(e.clientX<innerWidth*0.28)prev();
+    else if(e.clientX>innerWidth*0.72)next();
+  });
+  addEventListener('resize',fit);
+  addEventListener('hashchange',()=>{
+    const m=location.hash.match(/#\/(\d+)/);
+    if(m)show(parseInt(m[1],10)-1,false);
+  });
+  const m=location.hash.match(/#\/(\d+)/);
+  show(m?parseInt(m[1],10)-1:0,false);
+  fit();
+})();
+</script>
+</body>
+</html>

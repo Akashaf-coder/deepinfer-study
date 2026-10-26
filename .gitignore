@@ -1,0 +1,12 @@
+# 编辑器 / IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
